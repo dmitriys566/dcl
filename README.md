@@ -26,3 +26,13 @@ Used series at zero point and asymptotic expansion at infinity. Tested and have 
 6. GaussIntegrate
 Provided simple interface to gauss rule based on LegendrePoly (weights are precomputed). Double and complex.
 
+7. Bessel Functions
+Use external fortran realization for complex Bessel functions (Amos library)
+
+8. Linear algebra
+QR decomposition and multiplication of matrices.
+
+9. Clebsch Gordan coefficients
+
+10. Incomplete gamma function and ExpIntegral function
+I use continued fraction representation which is fast and have good accuracy
