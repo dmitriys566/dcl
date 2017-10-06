@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include "libdcl.h"
-#include <gsl/gsl_sf_bessel.h>
 
 int n;
 
