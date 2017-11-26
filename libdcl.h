@@ -7,6 +7,7 @@
 #include <openssl/rand.h>
 #include <stdint.h>
 #include <complex.h>
+#include <omp.h>
 #include "libamos.h"
 #define pi          3.14159265358979323846264338327
 #define e_const     2.71828182845904523536028747135
@@ -19,6 +20,7 @@
 #define angstrem 1e-8
 #define c_light 2.99792458e10
 
+int increment_add(int *array,int * add,int N,int nmax);
 double ClebschGordan(double j1,double m1,double j2,double m2,double j3,double m3);
 int KronekerDelta(int l1,int l2);
 double min(double a,double b);

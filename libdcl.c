@@ -27,6 +27,17 @@ int increment(int *array,int N,int nmax){
   return carry;
 }
 
+int increment_add(int *array,int * add,int N,int base){
+  int i,carry,c;
+  carry=0;
+  for(i=0;(i<N);i++){
+    c=(array[i]+add[i]+carry)/(base);
+    array[i]=(array[i]+add[i]+carry)%(base);
+    carry=c;
+  }
+  return carry;
+}
+
 //Use the Lanczcos approximation
 //TODO: fix the coefficients
 double Gamma(double x){
@@ -370,6 +381,38 @@ double complex ZGaussIntegrate(double complex(*f)(double[],void *),void *service
 }
 
 double GaussIntegrateElem(double (*f)(double[],void *),void *serviceData,int ndim,double a[],double b[]){
+//define Gauss rule;
+  static const double ksi[15]={-0.9879925180204854,-0.937273392400706,-0.8482065834104272,-0.7244177313601701,-0.5709721726085388,-0.3941513470775634,-0.2011940939974345,0,0.2011940939974345,0.3941513470775634,0.5709721726085388,0.7244177313601701,0.8482065834104272,0.937273392400706,0.9879925180204854};
+  static const double an[15]={0.03075324199611749,0.07036604748810815,0.107159220467172,0.1395706779261543,0.1662692058169939,0.1861610000155622,0.1984314853271116,0.2025782419255613,0.1984314853271116,0.1861610000155622,0.1662692058169939,0.1395706779261543,0.107159220467172,0.07036604748810815,0.03075324199611749};
+  int nmax=14;
+  int *idx;
+  double *x;
+  double rv,eta;
+  int i,j,carry;
+  idx=(int *)malloc(ndim*sizeof(int));
+  x=(double *)malloc(ndim*sizeof(double));
+  for(i=0;i<ndim;i++){
+    idx[i]=0;
+  }
+  rv=0.0;
+  carry=0;
+  while(!carry){
+    for(i=0;i<ndim;i++){
+      x[i]=ksi[idx[i]]*(b[i]-a[i])/2.0+(a[i]+b[i])/2.0;
+    }
+    eta=f(x,serviceData);
+    for(i=0;i<ndim;i++){
+      eta=eta*an[idx[i]]*(b[i]-a[i])/2.0;
+    }
+    rv+=eta;
+    carry=increment(idx,ndim,nmax);
+  }
+  free(idx);
+  free(x);
+  return rv;
+}
+
+double GaussIntegrateElemParallel(double (*f)(double[],void *),void *serviceData,int ndim,int ncores,double a[],double b[]){
 //define Gauss rule;
   static const double ksi[15]={-0.9879925180204854,-0.937273392400706,-0.8482065834104272,-0.7244177313601701,-0.5709721726085388,-0.3941513470775634,-0.2011940939974345,0,0.2011940939974345,0.3941513470775634,0.5709721726085388,0.7244177313601701,0.8482065834104272,0.937273392400706,0.9879925180204854};
   static const double an[15]={0.03075324199611749,0.07036604748810815,0.107159220467172,0.1395706779261543,0.1662692058169939,0.1861610000155622,0.1984314853271116,0.2025782419255613,0.1984314853271116,0.1861610000155622,0.1662692058169939,0.1395706779261543,0.107159220467172,0.07036604748810815,0.03075324199611749};

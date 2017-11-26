@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include "libdcl.h"
 
@@ -61,7 +62,11 @@ int main(){
   double x,y,t0,nsteps,dt;
   double complex z,p1,q1,res;
   double *a,*q,*r;
+  char str1[50],str2[50];
+  int *a_1, *b_1;
+  int len1,len2,l,cc;
   int N;
+  
   printf("Gamma()=%.16lg\n",log(Gamma(100.0)));
   printf("Ei()=%.16lg\n",ExpIntegralEi(0.01));
   printf("LogE=%.16lg\n",log(e_const));
@@ -71,6 +76,39 @@ int main(){
   printf("Lnm=%.16lg\n",LaguerreL(10,5,0.2));
   printf("K()=%.16lg\n",EllipticE(0.1));
   printf("C=%.16lg\n",ClebschGordan(0.5,0.5,0.5,-0.5,1,0));
-  print_complex("sf=",besselk(-2,2));
+  print_complex("sf=",besselj(-2,2+I));
+  a_1=(int *)malloc(50*sizeof(int));
+  b_1=(int *)malloc(50*sizeof(int));
+  for(i=0;i<50;i++){
+    a_1[i]=0;
+    b_1[i]=0;
+  }
+  scanf("%s",str1);
+  scanf("%s",str2);
+  len1=strlen(str1);
+  len2=strlen(str2);
+  for(i=len1-1;i>=0;i--){
+    a_1[i]=str1[len1-i-1]-'0';
+  }
+  for(i=len2-1;i>=0;i--){
+    b_1[i]=str2[len2-i-1]-'0';
+  }
+  cc=increment_add(a_1,b_1,50,10);
+  if(cc){
+    printf("%d",cc);
+  }
+  if(len1>len2){
+    l=len1;
+  }else{
+    l=len2;
+  }
+  for(i=0;i<50;i++){
+    if(a_1[i]){
+      l=i;
+    }
+  }
+  for(i=l;i>=0;i--){
+    printf("%d",a_1[i]);
+  }
   return 0;
 }
