@@ -4,10 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <openssl/rand.h>
+//#include <openssl/rand.h>
 #include <stdint.h>
 #include <complex.h>
-#include <omp.h>
 #include "libamos.h"
 #define pi          3.14159265358979323846264338327
 #define e_const     2.71828182845904523536028747135
@@ -20,7 +19,6 @@
 #define angstrem 1e-8
 #define c_light 2.99792458e10
 
-int increment_add(int *array,int * add,int N,int nmax);
 double ClebschGordan(double j1,double m1,double j2,double m2,double j3,double m3);
 int KronekerDelta(int l1,int l2);
 double min(double a,double b);
@@ -41,9 +39,11 @@ double complex ZGaussIntegrateElem(double complex(*f)(double[],void *),void * se
 double GaussIntegrate(double (*f)(double[],void *),void * serviceData,int ndim,double a[],double b[],int m);
 double complex ZGaussIntegrate(double complex(*f)(double[],void *),void * serviceData,int ndim,double a[],double b[],int m);
 int IsNaN(double x);
+int IsInf(double x);
 int sign(double x);
 double FindZero(double (*f)(double,void*),double a,double b,void *serviceData,int *errcode);
 double FindNZero(double(*f)(double,void *),double x0,double x1,void *serviceData,double sep,int i,int * nf);
+double EulerBeta(double x,double y);
 double LegendreP(int n,double x);
 double DLegendreP(int n,double x);
 void MatrixMatrixMultiply(double *r,double *a,double *b,int m,int n,int k);
@@ -51,8 +51,9 @@ double SQR(double x);
 double pythag(double a,double b );
 void QR_decompose_rotation(double *a,double *q,double *r,int n);
 void QR_decompose_reflection(double *a,double *q,double *r,int n);
+void QR_solve(int N,double *q,double *r,double *b,double *x);
 void printMatrix(double *a,char * title,int m,int n);
-double random_double();
+//double random_double();
 int rk4(void (*F)(int,double,double [],double[],void *),int neq,double y[],double t0,double dt,int nsteps,void *serviceData);
 int rk4_step(void (*F)(int,double,double [],double[],void *),int neq,double y[],double t,double dt,void *serviceData);
 int rk5(void (*F)(int,double,double [],double[],void *),int neq,double y[],double t0,double dt,int nsteps,void *serviceData);
@@ -73,13 +74,8 @@ double sj(int l,double x);
 double sy(int l,double x);
 double si(int l,double x);
 double sk(int l,double x);
-
-double complex BesselJ(double nu,double complex z);
+double Pochgammer(int n,double alpha);
+double Hypergeometric1F1(double a,double c,double z);
+double WhittakerM(double lambda,double mu,double z);
 double ifact(int k);
-double complex rk(int k,double complex nu);
-double complex B2k(unsigned int k2,double complex p);
-double complex Bk(double k,double complex p);
-double complex Ipq(double complex p,double complex q);
-
-
 #endif

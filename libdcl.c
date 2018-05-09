@@ -9,6 +9,22 @@ typedef struct{
   double k;
 }serviceData;
 
+typedef struct{
+  double mu;
+  double lambda;
+  double z;
+}w_params;
+
+typedef struct{
+  double alpha;
+  double beta1;
+  double beta2;
+  double gamma1;
+  double gamma2;
+  double x;
+  double y;
+}f2_params;
+
 //This function is used to increment indexes in Gauss integrate//
 //TODO fix recursion in orthogonal polynoms.
 //TODO add parallelism in integration
@@ -23,17 +39,6 @@ int increment(int *array,int N,int nmax){
       array[i]++;
       carry=0;
     }
-  }
-  return carry;
-}
-
-int increment_add(int *array,int * add,int N,int base){
-  int i,carry,c;
-  carry=0;
-  for(i=0;(i<N);i++){
-    c=(array[i]+add[i]+carry)/(base);
-    array[i]=(array[i]+add[i]+carry)%(base);
-    carry=c;
   }
   return carry;
 }
@@ -412,38 +417,6 @@ double GaussIntegrateElem(double (*f)(double[],void *),void *serviceData,int ndi
   return rv;
 }
 
-double GaussIntegrateElemParallel(double (*f)(double[],void *),void *serviceData,int ndim,int ncores,double a[],double b[]){
-//define Gauss rule;
-  static const double ksi[15]={-0.9879925180204854,-0.937273392400706,-0.8482065834104272,-0.7244177313601701,-0.5709721726085388,-0.3941513470775634,-0.2011940939974345,0,0.2011940939974345,0.3941513470775634,0.5709721726085388,0.7244177313601701,0.8482065834104272,0.937273392400706,0.9879925180204854};
-  static const double an[15]={0.03075324199611749,0.07036604748810815,0.107159220467172,0.1395706779261543,0.1662692058169939,0.1861610000155622,0.1984314853271116,0.2025782419255613,0.1984314853271116,0.1861610000155622,0.1662692058169939,0.1395706779261543,0.107159220467172,0.07036604748810815,0.03075324199611749};
-  int nmax=14;
-  int *idx;
-  double *x;
-  double rv,eta;
-  int i,j,carry;
-  idx=(int *)malloc(ndim*sizeof(int));
-  x=(double *)malloc(ndim*sizeof(double));
-  for(i=0;i<ndim;i++){
-    idx[i]=0;
-  }
-  rv=0.0;
-  carry=0;
-  while(!carry){
-    for(i=0;i<ndim;i++){
-      x[i]=ksi[idx[i]]*(b[i]-a[i])/2.0+(a[i]+b[i])/2.0;
-    }
-    eta=f(x,serviceData);
-    for(i=0;i<ndim;i++){
-      eta=eta*an[idx[i]]*(b[i]-a[i])/2.0;
-    }
-    rv+=eta;
-    carry=increment(idx,ndim,nmax);
-  }
-  free(idx);
-  free(x);
-  return rv;
-}
-
 double complex ZGaussIntegrateElem(double complex(*f)(double[],void *),void *serviceData,int ndim,double a[],double b[]){
 //define Gauss rule;
   static const double ksi[15]={-0.9879925180204854,-0.937273392400706,-0.8482065834104272,-0.7244177313601701,-0.5709721726085388,-0.3941513470775634,-0.2011940939974345,0,0.2011940939974345,0.3941513470775634,0.5709721726085388,0.7244177313601701,0.8482065834104272,0.937273392400706,0.9879925180204854};
@@ -489,6 +462,10 @@ int IsNaN(double x){
     }
   }
   return rv;
+}
+
+int IsInf(double x){
+  return 1.0/x==0;
 }
 
 int sign(double x){
@@ -752,6 +729,29 @@ void QR_decompose_rotation(double *a,double *q,double *r,int n){
   return;
 }
 
+//Решатель СЛАУ
+void QR_solve(int N,double *q,double *r,double *b,double *x){
+  int i,j;
+  double *bn;
+  double sum;
+  bn=(double *)malloc(N*sizeof(double));
+  for(i=0;i<N;i++){
+    bn[i]=0;
+    for(j=0;j<N;j++){
+      bn[i]+=q[j*N+i]*b[j];//bn=Qt*b;
+    }
+  }
+  for(i=N-1;i>=0;i--){
+    sum=0;
+    for(j=i+1;j<N;j++){
+      sum+=r[i*N+j]*x[j];
+    }
+    x[i]=(bn[i]-sum)/r[i*N+i];
+  }
+  free(bn);
+  return;
+}
+
 void QR_decompose_reflection(double *a,double *q,double *r,int n){
   int i,j,k;
   double *v;
@@ -815,7 +815,7 @@ void QR_decompose_reflection(double *a,double *q,double *r,int n){
   free(v);
 }
 
-double random_double() {
+/*double random_double() {
     union {
         uint64_t i;
         unsigned char c[sizeof(uint64_t)];
@@ -826,7 +826,7 @@ double random_double() {
         exit(1);
     }
     return (u.i >> 11) * (1.0/9007199254740992.0);
-}
+}*/
 
 
 void printMatrix(double *a,char * title,int m,int n){
@@ -1195,142 +1195,127 @@ double sk(int l,double x){
 }
 
 
-
-double complex rk(int k,double complex nu){
-  int m,i;
-  double complex prod;
-  prod=1.0;
-  if(k%2!=0){
-    m=k/2;
-    for(i=1;i<=m;i++){
-      prod*=(nu*nu+(2*i-1)*(2*i-1));
-    }
-    prod*=nu;
-  }else{
-    m=k/2;
-    for(i=1;i<=m;i++){
-      prod*=(nu*nu+(2*i-2)*(2*i-2));
-    }
+//Add new code
+double Pochgammer(int n,double alpha){
+  int i;
+  double prod=1;
+  for(i=0;i<n;i++){
+    prod*=(alpha+i);
   }
   return prod;
 }
 
-double complex rk_regular(int k,double complex nu){
-  int m,i;
-  double complex prod;
-  prod=1.0;
-  m=k/2;
-  for(i=1;i<=m;i++){
-    prod*=(nu*nu+(2*i-1)*(2*i-1));
+double Hypergeometric1F1(double a,double c,double z){
+  double sum=0;
+  double eps=1e-16;
+  double term=1;
+  int i,maxiter;
+  maxiter=100;
+  for(i=0;i<maxiter && fabs(term) >fabs(sum)*eps;i++){
+    term=ipow(z,i)*Pochgammer(i,a)/Pochgammer(i,c)/ifact(i);
+    sum+=term;
   }
-  return prod;
+  return sum;
 }
 
-double complex Bk(double k,double complex p){
-  return pow(2.0,-3.0/2.0-k)*cpow(p,-1.0/2.0-k)*ZGammaIncomplete(k+1.0/2.0,p);
+double EulerBeta(double x,double y){
+  return Gamma(x)*Gamma(y)/Gamma(x+y);
 }
 
-double complex Ipq(double complex p,double complex q){
-  double complex result,term,tmp;
-  double epsilon;
-  int i,n_max;
-  result=0.0;
-  epsilon=1e-17;
-  print_complex("P=",p);
-  print_complex("Q=",q);
-  for(i=0;i<N_max;i++){
-    term=Bk((double)i,p)*rk_regular(2*i+1,-2*I*q)/ifact(2*i);
-    tmp=Bk((double)i,p);
-    printf("term[%d]=(%.16lg %.16lg); rk=(%.16lg,%.16lg)\n",i,creal(term),cimag(term),creal(rk_regular(2*i+1,-2*I*q)),cimag(rk_regular(2*i+1,-2*I*q)));
-    result+=term;
-    if(cabs(term)<epsilon*cabs(result)){
-      break;
-    }else{
-      //printf("ratio=%.16lg\n",cabs(term)/cabs(result));
-    }
-  }
-  result=4.0*result*cexp(p);
-  print_complex("Ipq=",result);
+double to_m(double *tp,void *sd){
+  w_params *ptr;
+  double t,lambda,mu,z;
+  ptr=(w_params *)sd;
+  t=*tp;
+  lambda=ptr->lambda;
+  mu=ptr->mu;
+  z=ptr->z;
+  return pow((1+t),mu-lambda-1.0/2.0)*pow((1-t),mu+lambda-1.0/2.0)*exp(z*t/2.0);
+}
+
+double WhittakerM(double lambda,double mu,double z){
+  double result,a,b;
+  w_params p;
+  p.mu=mu;
+  p.lambda=lambda;
+  p.z=z;
+  a=-1;
+  b=1;
+  result=pow(z,mu+1.0/2.0)/(pow(2.0,2*mu)*EulerBeta(mu+lambda+1.0/2.0,mu-lambda+1.0/2.0));
+  result=result*GaussIntegrate(to_m,(void *)&p,1,&a,&b,1000);
   return result;
 }
 
-double complex An(int n,double complex nu){
-  if(n==0){
-    return cpow(2.0,-nu);
-  }else{
-    return -((nu+2*n-2)*(nu+2*n-1)/(4.0*n*(n+nu)))*An(n-1,nu);
+
+double complex to_f2(double *z,void *sd){
+  f2_params *p;
+  double u,v;
+  double alpha,beta1,beta2,gamma1,gamma2,x,y;
+  double complex result;
+  double complex ca,cb;
+  p=(f2_params *)sd;
+  alpha=p->alpha;
+  beta1=p->beta1;
+  beta2=p->beta2;
+  gamma1=p->gamma1;
+  gamma2=p->gamma2;
+  x=p->x;
+  y=p->y;
+  u=z[0];
+  v=z[1];
+  result=cpow(u,beta1-1.0)*cpow(v,beta2-1.0)*cpow(1-u,gamma1-beta1-1)*cpow(1-v,gamma2-beta2-1)*cpow(1-u*x-v*y,-alpha);
+  if(IsInf(creal(result))){
+    result=0;
   }
-}
-
-double complex alpha_n(int n,double complex z){
-  return cpow(z,-1-n)*ZGammaIncomplete(n+1.0,z/2.0);
-}
-
-double complex beta_n(int n,double complex z){
-  return pow(-1.0,n)*cpow(-z,-1-n)*ZGammaIncomplete(n+1.0,-z/2.0)+cpow(z,-1-n)*ZGammaIncomplete(n+1.0,z/2.0);
-}
-
-double complex a_n(int n,double k,double complex nu){
-  double complex *array;
-  double complex a0,a1,rv;
-  int i;
-  a0=cpow((k+sqrt(k*k+1)),-nu);
-  a1=-nu*a0/sqrt(k*k+1);
-  if(n==0){
-    return a0;
+  if(IsNaN(creal(cpow(1-u*x-v*y,-alpha)))){
+    result=cpow(u,beta1-1.0)*cpow(v,beta2-1.0)*cpow(1-u,gamma1-beta1-1)*cpow(1-v,gamma2-beta2-1);//Hack;; 0^0=1;
   }
-  if(n==1){
-    return a1;
-  }
-  array=(double complex *)malloc((n+1)*sizeof(double complex));
-  array[0]=a0;
-  array[1]=a1;
-  for(i=0;i<=(n-2);i++){
-    array[i+2]=(1.0/(k*k+1.0))*((nu*nu-i*i)*array[i]-k*(i+1)*(2*i+1)*array[i+1])/((i+1)*(i+2));
-  }
-  rv=array[n];
-  free(array);
-  return rv;
+  return result;
 }
 
-double complex In(int n,double theta,double complex z,double complex nu){
-  return pow(theta,1-(2*n)-nu)*ZExpIntegralE(2*n+nu,theta*z);
+double complex HypergeometricF2(double alpha,double beta1,double beta2,double gamma1,double gamma2,double x,double y){
+  f2_params p;
+  double complex result;
+  double a[2];
+  double b[2];
+  p.alpha=alpha;
+  p.beta1=beta1;
+  p.beta2=beta2;
+  p.gamma1=gamma1;
+  p.gamma2=gamma2;
+  p.x=x;
+  p.y=y;
+  a[0]=0.0;
+  b[0]=1.0;
+  a[1]=0.0;
+  b[1]=1.0;
+  result=Gamma(gamma1)*Gamma(gamma2)/(Gamma(beta1)*Gamma(beta2)*Gamma(gamma1-beta1)*Gamma(gamma2-beta2));
+  result*=ZGaussIntegrate(to_f2,(void *)&p,2,a,b,10);
+  return result;
 }
 
-double complex BesselJ(double nu,double complex z){
-  double complex sum,rv,term;
-  int n,k;
-  if(nu==0.0){
-    return (1.0/(2*pi))*(Ipq(I*z,0.0)+Ipq(-I*z,0.0));
-  }/*else if(nu>nu_max){
-    return 2.0*(nu-1)*BesselJ(nu-1.0,z)/z-BesselJ(nu-2.0,z);
-  }*/else{
-    printf("I AM HERE nu=%.16lg\n",nu);
-    rv=(1.0/(2*pi))*(cexp(-I*nu*pi/2.0)*Ipq(I*z,nu)+cexp(I*nu*pi/2.0)*Ipq(-I*z,nu));
-    rv+=-sin(nu*pi)/(nu*pi);
-//    print_complex("RV1=",rv);
-    sum=0.0;
-    for(n=0;n<N_max;n++){
-      sum+=alpha_n(n,z)*a_n(n,0,nu);
-      term=0.0;
-      for(k=1;k<=N_trunc;k++){
-        term+=cexp(-k*z)*a_n(n,k,nu);
-      }
-      sum+=term*beta_n(n,z);
+//простой ряд с ограниченной сходимостью.
+double HypergeometricFA(int n,double alpha[],double beta [],double gamma [],double z[]){
+  int *mi;
+  int i,carry,m_max,ms;
+  double prod,sum;
+  mi=(int *)malloc(n*sizeof(int));
+  for(i=0;i<n;i++){
+    mi[i]=0;
+  }
+  carry=0;
+  m_max=100;
+  sum=0;
+  while(!carry){
+    prod=1;
+    ms=0;
+    for(i=0;i<n;i++){
+      prod*=Pochgammer(mi[i],beta[i])*ipow(z[i],mi[i])/(Pochgammer(mi[i],gamma[i])*ifact(mi[i]));
+      ms+=mi[i];
     }
-    rv+=sum*z*sin(nu*pi)/(nu*pi);
-    sum=0;
-    for(n=0;n<N_max;n++){
-      sum+=An(n,nu)*In(n,N_trunc+1.0/2.0,z,nu);
-    }
-    rv+=sum*z*sin(nu*pi)/(nu*pi);
-    return rv;
+    prod*=Pochgammer(ms,alpha[0]);
+    sum+=prod;
+    carry=increment(mi,n,m_max);
   }
-}
-
-double SphericalBesselJ(int j,double x){
-  int i,s,k,n;
-  double *array;
-  double epsilon,result,add;
-  return 0;
+  return sum;
 }
